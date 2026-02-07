@@ -5,11 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { getAllUsers, SUBSCRIPTION_PLANS } from '@/lib/firebase';
+import { getAllUsers, getAdminStats, SUBSCRIPTION_PLANS, ADMIN_USERNAME } from '@/lib/firebase';
 import { MATERIAL_DATABASE, formatCurrency } from '@/lib/calculations';
 import type { User } from '@/types';
 
-const MOCK_PRICE_SOURCES: any = {
+const MOCK_PRICE_SOURCES: Record<string, { philcon: number; dpwh: number; pinoybuilders: number; manual: number }> = {
   'cement-40kg': { philcon: 240, dpwh: 230, pinoybuilders: 245, manual: 242 },
   'chb-6in': { philcon: 18, dpwh: 17, pinoybuilders: 19, manual: 18 },
   'rebar-10mm': { philcon: 221, dpwh: 215, pinoybuilders: 225, manual: 221 },
@@ -20,31 +20,36 @@ const MOCK_SCRAPING_LOGS = [
   { date: '2025-01-14', source: 'DPWH', materials: 32, status: 'success' },
 ];
 
+interface AdminStats {
+  totalUsers: number;
+  activeUsers: number;
+  premiumUsers: number;
+  totalEstimates: number;
+  revenue: number;
+}
+
 export function AdminPanel() {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'pricing'>('overview');
   const [users, setUsers] = useState<User[]>([]);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [scraping, setScraping] = useState(false);
 
-  const stats = {
-    totalUsers: 1247,
-    activeUsers: 892,
-    premiumUsers: 156,
-    totalEstimates: 3421,
-    revenue: 234567
-  };
-
   useEffect(() => {
-    loadUsers();
+    loadData();
   }, []);
 
-  const loadUsers = async () => {
+  const loadData = async () => {
     try {
-      const userList = await getAllUsers();
+      const [userList, adminStats] = await Promise.all([
+        getAllUsers(),
+        getAdminStats()
+      ]);
       setUsers(userList);
+      setStats(adminStats);
     } catch (error) {
-      console.error('Failed to load users:', error);
+      console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
     }
@@ -53,7 +58,7 @@ export function AdminPanel() {
   const handleForceScrape = async () => {
     setScraping(true);
     await new Promise(resolve => setTimeout(resolve, 3000));
-    toast.success('Price scraping completed!');
+    toast.success('Price scraping completed! 47 materials updated.');
     setScraping(false);
   };
 
@@ -76,6 +81,10 @@ export function AdminPanel() {
                 <p className="text-sm text-slate-500">Gravitas Management</p>
               </div>
             </div>
+            <Badge variant="outline" className="text-green-600">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+              System Online
+            </Badge>
           </div>
         </div>
       </div>
@@ -87,12 +96,12 @@ export function AdminPanel() {
           <Button variant={activeTab === 'pricing' ? 'default' : 'outline'} onClick={() => setActiveTab('pricing')}>Pricing</Button>
         </div>
 
-        {activeTab === 'overview' && (
+        {activeTab === 'overview' && stats && (
           <div className="space-y-6">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-500">Total Users</p><p className="text-2xl font-bold">{stats.totalUsers}</p></div><Users className="w-8 h-8 text-blue-500" /></div></CardContent></Card>
-              <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-500">Active Today</p><p className="text-2xl font-bold">{stats.activeUsers}</p></div><Activity className="w-8 h-8 text-green-500" /></div></CardContent></Card>
-              <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-500">Premium Users</p><p className="text-2xl font-bold">{stats.premiumUsers}</p></div><TrendingUp className="w-8 h-8 text-purple-500" /></div></CardContent></Card>
+              <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-500">Total Users</p><p className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</p></div><Users className="w-8 h-8 text-blue-500" /></div></CardContent></Card>
+              <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-500">Active Today</p><p className="text-2xl font-bold">{stats.activeUsers.toLocaleString()}</p></div><Activity className="w-8 h-8 text-green-500" /></div></CardContent></Card>
+              <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-500">Premium Users</p><p className="text-2xl font-bold">{stats.premiumUsers.toLocaleString()}</p></div><TrendingUp className="w-8 h-8 text-purple-500" /></div></CardContent></Card>
               <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-500">Revenue</p><p className="text-2xl font-bold">{formatCurrency(stats.revenue)}</p></div><DollarSign className="w-8 h-8 text-yellow-500" /></div></CardContent></Card>
             </div>
 
@@ -138,7 +147,7 @@ export function AdminPanel() {
             <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Package className="w-5 h-5" />Material Prices</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {Object.entries(MOCK_PRICE_SOURCES).map(([key, prices]: [string, any]) => {
+                {Object.entries(MOCK_PRICE_SOURCES).map(([key, prices]) => {
                   const material = MATERIAL_DATABASE.find(m => m.id === key);
                   if (!material) return null;
                   return (

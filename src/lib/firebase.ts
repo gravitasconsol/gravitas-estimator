@@ -27,7 +27,7 @@ import {
 import { auth, db } from './firebase-config';
 import type { User, Estimate, UserTier, ContractorScale } from '@/types';
 
-const ADMIN_USERNAME = 'gravitasconsol0828';
+export const ADMIN_USERNAME = 'gravitasconsol0828';
 const ADMIN_PASSWORD = 'David1david2';
 
 function convertUser(fbUser: FirebaseUser, extraData: Partial<User> = {}): User {
@@ -89,11 +89,11 @@ export async function signUpWithEmail(email: string, password: string, displayNa
   const result = await createUserWithEmailAndPassword(auth, email, password);
   await updateProfile(result.user, { displayName });
   
-  const userData: any = {
+  const userData: Partial<User> = {
     uid: result.user.uid,
     email,
     displayName,
-    tier: 'free',
+    tier: 'free' as UserTier,
     tierStatus: 'active',
     estimatesUsedThisMonth: 0,
     lastEstimateReset: new Date(),
@@ -102,7 +102,7 @@ export async function signUpWithEmail(email: string, password: string, displayNa
     companyName: contractorProfile?.companyName,
     contactNumber: contractorProfile?.contactNumber,
     address: contractorProfile?.address,
-    scale: contractorProfile?.scale,
+    scale: contractorProfile?.scale as ContractorScale,
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -128,7 +128,7 @@ export async function signInWithGoogle(): Promise<User> {
       uid: result.user.uid,
       email: result.user.email || '',
       displayName: result.user.displayName || 'Google User',
-      tier: 'free',
+      tier: 'free' as UserTier,
       tierStatus: 'active',
       estimatesUsedThisMonth: 0,
       lastEstimateReset: new Date(),
@@ -154,7 +154,7 @@ export async function signInWithFacebook(): Promise<User> {
       uid: result.user.uid,
       email: result.user.email || '',
       displayName: result.user.displayName || 'Facebook User',
-      tier: 'free',
+      tier: 'free' as UserTier,
       tierStatus: 'active',
       estimatesUsedThisMonth: 0,
       lastEstimateReset: new Date(),
@@ -176,11 +176,11 @@ export async function loginAsAdmin(username: string, password: string): Promise<
     
     try {
       const result = await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
-      const extraData: any = {
+      const extraData: Partial<User> = {
         uid: result.user.uid,
         email: adminEmail,
         displayName: 'Gravitas Admin',
-        tier: 'premium',
+        tier: 'premium' as UserTier,
         tierStatus: 'active',
         isAdmin: true,
         loginMethod: 'username',
@@ -193,11 +193,11 @@ export async function loginAsAdmin(username: string, password: string): Promise<
       if (error.code === 'auth/user-not-found') {
         const result = await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
         await updateProfile(result.user, { displayName: 'Gravitas Admin' });
-        const extraData: any = {
+        const extraData: Partial<User> = {
           uid: result.user.uid,
           email: adminEmail,
           displayName: 'Gravitas Admin',
-          tier: 'premium',
+          tier: 'premium' as UserTier,
           tierStatus: 'active',
           isAdmin: true,
           loginMethod: 'username',
@@ -243,10 +243,10 @@ export async function updateUserTier(uid: string, tier: UserTier): Promise<void>
   });
 }
 
-export async function createEstimate(estimate: any): Promise<any> {
+export async function createEstimate(estimate: Omit<Estimate, 'id' | 'createdAt' | 'updatedAt'>): Promise<Estimate> {
   const estimateRef = doc(collection(db, 'estimates'));
   const now = new Date();
-  const newEstimate = {
+  const newEstimate: Estimate = {
     ...estimate,
     id: estimateRef.id,
     createdAt: now,
@@ -273,7 +273,7 @@ export async function createEstimate(estimate: any): Promise<any> {
   return newEstimate;
 }
 
-export async function getUserEstimates(userId: string): Promise<any[]> {
+export async function getUserEstimates(userId: string): Promise<Estimate[]> {
   const q = query(collection(db, 'estimates'), where('userId', '==', userId), orderBy('createdAt', 'desc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => {
@@ -283,7 +283,7 @@ export async function getUserEstimates(userId: string): Promise<any[]> {
       ...data,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date()
-    };
+    } as Estimate;
   });
 }
 
@@ -299,7 +299,48 @@ export async function getAllUsers(): Promise<User[]> {
   });
 }
 
-export const SUBSCRIPTION_PLANS: any = {
+export async function getAdminStats(): Promise<{
+  totalUsers: number;
+  activeUsers: number;
+  premiumUsers: number;
+  totalEstimates: number;
+  revenue: number;
+}> {
+  const usersSnapshot = await getDocs(collection(db, 'users'));
+  const estimatesSnapshot = await getDocs(collection(db, 'estimates'));
+  const subscriptionsSnapshot = await getDocs(collection(db, 'subscriptions'));
+  
+  const users = usersSnapshot.docs.map(d => d.data());
+  const premiumUsers = users.filter(u => u.tier === 'premium' || u.tier === 'standard').length;
+  const activeUsers = users.filter(u => {
+    const lastLogin = u.updatedAt?.toDate?.() || u.updatedAt;
+    if (!lastLogin) return false;
+    const daysSinceLogin = (Date.now() - new Date(lastLogin).getTime()) / (1000 * 60 * 60 * 24);
+    return daysSinceLogin < 30;
+  }).length;
+  
+  const revenue = subscriptionsSnapshot.docs
+    .filter(d => d.data().status === 'active')
+    .reduce((sum, d) => sum + (d.data().amount || 0), 0) / 100;
+  
+  return {
+    totalUsers: users.length,
+    activeUsers,
+    premiumUsers,
+    totalEstimates: estimatesSnapshot.docs.length,
+    revenue
+  };
+}
+
+export const SUBSCRIPTION_PLANS: Record<UserTier, {
+  id: string;
+  name: string;
+  price: number;
+  priceFormatted: string;
+  maxEstimates: number;
+  features: string[];
+  limitations: string[];
+}> = {
   free: {
     id: 'free',
     name: 'FREE',
@@ -329,7 +370,12 @@ export const SUBSCRIPTION_PLANS: any = {
   }
 };
 
-export const CONTRACTOR_SCALES: any = {
+export const CONTRACTOR_SCALES: Record<ContractorScale, {
+  id: string;
+  name: string;
+  description: string;
+  recommendedPlan: UserTier;
+}> = {
   micro: { id: 'micro', name: 'Micro', description: '1-5 workers', recommendedPlan: 'free' },
   small: { id: 'small', name: 'Small', description: '6-20 workers', recommendedPlan: 'standard' },
   medium: { id: 'medium', name: 'Medium', description: '21-100 workers', recommendedPlan: 'premium' },
