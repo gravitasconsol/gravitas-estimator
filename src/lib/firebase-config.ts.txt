@@ -4,12 +4,12 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY_FROM_STEP_1.2",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
+  apiKey: "AIzaSyDkdQ29wiHNM-rswIwzdlpDfkRR78udCqI",
+  authDomain: "gravitas-estimator.firebaseapp.com",
+  projectId: "gravitas-estimator",
+  storageBucket: "gravitas-estimator.firebasestorage.app",
+  messagingSenderId: "783217337183",
+  appId: "1:783217337183:web:52d4b8dd40b58eea6a0cea"
 };
 
 const app = initializeApp(firebaseConfig);
