@@ -318,52 +318,15 @@ export function DashboardScreen({ user, onNewEstimate, onSubscribe }: DashboardS
               ))}
             </div>
             
-            {plan.limitations.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <p className="text-sm text-slate-500 mb-2">Upgrade to unlock:</p>
-                <div className="flex flex-wrap gap-2">
-                  {plan.limitations.map((limitation, index) => (
-                    <Badge key={index} variant="outline" className="text-slate-500">
-                      {limitation}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Support Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Mail className="w-5 h-5 text-blue-600" />
-              Need Help?
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-slate-600 mb-4">
-              Our support team is here to help you with any questions or issues.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <a 
-                href={`mailto:${SUPPORT_EMAIL}`}
-                className="flex items-center gap-2 text-blue-600 hover:underline"
-              >
-                <Mail className="w-4 h-4" />
-                {SUPPORT_EMAIL}
-              </a>
-              <a 
-                href="tel:+6328XXXXXXX"
-                className="flex items-center gap-2 text-blue-600 hover:underline"
-              >
-                <Phone className="w-4 h-4" />
-                +63 (2) 8XXX-XXXX
-              </a>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+           {plan.limitations && plan.limitations.length > 0 && (
+  <div className="mt-4 pt-4 border-t border-slate-200">
+    <p className="text-sm text-slate-500 mb-2">Upgrade to unlock:</p>
+    <div className="flex flex-wrap gap-2">
+      {plan.limitations.map((limitation: string, index: number) => (
+        <Badge key={index} variant="outline" className="text-slate-500">
+          {limitation}
+        </Badge>
+      ))}
     </div>
-  );
-}
+  </div>
+)}
