@@ -5,7 +5,7 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Get PayMongo key from environment variable (NOT hardcoded)
-const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY;
+const PAYMONGO_SECRET_KEY = functions.config().paymongo.secret_key;
 
 const https = require('https');
 
