@@ -1,0 +1,154 @@
+// PayMongo Client-Side Integration
+// Uses environment variable for public key
+
+const PAYMONGO_PUBLIC_KEY = import.meta.env.VITE_PAYMONGO_PUBLIC_KEY || 'pk_live_vURCd7mkGSCwjDjXvwfKAYbg';
+
+export async function createPaymentIntent(
+  amount: number,
+  description: string,
+  metadata: Record<string, string>
+): Promise<{ clientKey: string; paymentIntentId: string }> {
+  const response = await fetch('https://api.paymongo.com/v1/payment_intents', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${btoa(PAYMONGO_PUBLIC_KEY + ':')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      data: {
+        attributes: {
+          amount: amount,
+          currency: 'PHP',
+          description: description,
+          payment_method_allowed: ['card', 'gcash', 'grab_pay', 'paymaya'],
+          metadata: metadata
+        }
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.errors?.[0]?.detail || 'Failed to create payment');
+  }
+
+  const result = await response.json();
+  return {
+    clientKey: result.data.attributes.client_key,
+    paymentIntentId: result.data.id
+  };
+}
+
+export async function createPaymentMethod(
+  cardNumber: string,
+  expMonth: string,
+  expYear: string,
+  cvc: string,
+  billingName: string,
+  billingEmail: string
+): Promise<{ id: string }> {
+  const response = await fetch('https://api.paymongo.com/v1/payment_methods', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${btoa(PAYMONGO_PUBLIC_KEY + ':')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      data: {
+        attributes: {
+          type: 'card',
+          details: {
+            card_number: cardNumber.replace(/\s/g, ''),
+            exp_month: parseInt(expMonth),
+            exp_year: parseInt(expYear),
+            cvc: cvc
+          },
+          billing: {
+            name: billingName,
+            email: billingEmail
+          }
+        }
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.errors?.[0]?.detail || 'Invalid card details');
+  }
+
+  const result = await response.json();
+  return { id: result.data.id };
+}
+
+export async function attachPaymentMethod(
+  paymentIntentId: string,
+  paymentMethodId: string,
+  clientKey: string
+): Promise<void> {
+  const response = await fetch(`https://api.paymongo.com/v1/payment_intents/${paymentIntentId}/attach`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${btoa(PAYMONGO_PUBLIC_KEY + ':')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      data: {
+        attributes: {
+          payment_method: paymentMethodId,
+          client_key: clientKey
+        }
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.errors?.[0]?.detail || 'Payment failed');
+  }
+}
+
+export async function createEWalletSource(
+  type: 'gcash' | 'grab_pay' | 'paymaya',
+  amount: number,
+  description: string,
+  successUrl: string,
+  failedUrl: string
+): Promise<{ checkoutUrl: string; sourceId: string }> {
+  const response = await fetch('https://api.paymongo.com/v1/sources', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${btoa(PAYMONGO_PUBLIC_KEY + ':')}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      data: {
+        attributes: {
+          type: type,
+          amount: amount,
+          currency: 'PHP',
+          description: description,
+          redirect: {
+            success: successUrl,
+            failed: failedUrl
+          }
+        }
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.errors?.[0]?.detail || 'Failed to create payment source');
+  }
+
+  const result = await response.json();
+  return {
+    checkoutUrl: result.data.attributes.redirect.checkout_url,
+    sourceId: result.data.id
+  };
+}
+
+export function formatAmountForPayMongo(pesos: number): number {
+  return Math.round(pesos * 100);
+}
